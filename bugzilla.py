@@ -45,6 +45,21 @@ def import_bugs_activity():
 
   dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
-import_attachments()
-import_bugs_activity()
+def import_products():
+  export_query="SELECT id,name from products;"
+  import_query="INSERT IGNORE INTO bug_product \
+  (product_key,product_name) \
+  VALUES (%s,%s);"
+  dw_mysql.export_import("bugzilla", export_query, (),import_query)
+
+def import_components():
+  export_query="SELECT id,name,product_id from components;"
+  import_query="INSERT IGNORE INTO bug_component \
+  (component_key,component_name,product_key) \
+  VALUES (%s,%s,%s);"
+  dw_mysql.export_import("bugzilla", export_query, (),import_query)
+#import_attachments()
+#import_bugs_activity()
+import_products()
+import_components()
 
