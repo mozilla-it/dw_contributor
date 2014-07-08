@@ -5,10 +5,27 @@ import run_queries
 lower_limit="2014-06-01 00:00:00";
 upper_limit="2014-07-01 00:00:00";
 
-lower_limit="2011-01-01 00:00:00";
+lower_limit="2008-01-01 00:00:00";
 upper_limit="2014-06-01 00:00:00";
 print lower_limit
 print upper_limit
+
+def import_accounts(): 
+  export_query="SELECT \
+  email, '' as locale, '' as topic, '' as product,  \
+  CONCAT('https://support.mozilla.org/en-US/user/',username) as canonical, \
+  'Creating SUMO account' as action,  \
+  0 as extra_id, date_joined as local_datetime, \
+  TIMEDIFF(UTC_TIMESTAMP(),NOW()) as tz_offset \
+  FROM auth_user \
+  WHERE date_joined BETWEEN %s AND %s;"
+
+  import_query="INSERT IGNORE INTO sumo_facts_raw \
+  set email=%s, extra_locale=%s, extra_topic=%s,  \
+  extra_product=%s, canonical=%s, action=%s,  \
+  extra_id=%s, local_datetime=%s, tz_offset=%s;"
+
+  dw_mysql.export_import("sumo", export_query, (str(lower_limit),str(upper_limit)), import_query)
 
 def import_forum_posts(): 
   export_query="SELECT \
@@ -146,6 +163,20 @@ def create_kb_revision_query(grp_cnt):
   GROUP BY contributor_key HAVING count(*)>=" + grp_cnt
   return kb_revision_query
 
+def create_l10n_query(grp_cnt):
+  l10n_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
+  contributor_key, for_n_l10ns.conversion_key,source.source_key,team.team_key \
+  FROM contributor_facts \
+  INNER JOIN conversion as for_1_l10n ON (for_1_l10n.conversion_desc='l10n 1 KB article' AND for_1_l10n.conversion_key=contributor_facts.conversion_key) \
+  INNER JOIN source ON (source_name='sumo') \
+  INNER JOIN team ON (team_name='Sumo') \
+  INNER JOIN conversion as for_n_l10ns ON (for_n_l10ns.conversion_desc='l10n " + grp_cnt + " KB articles') \
+  WHERE utc_datetime BETWEEN %s - interval 1 year AND %s \
+  GROUP BY contributor_key HAVING count(*)>=" + grp_cnt
+  return l10n_query
 
 def create_forum_answer_query(grp_cnt):
   forum_answer_query="INSERT IGNORE INTO contributor_facts \
@@ -164,51 +195,65 @@ def create_forum_answer_query(grp_cnt):
 
 
 def aggregate_to_contributor_facts():
-  # replace with an import into sumo_facts_raw
-  # SUMO - creating an account is select date_joined from auth_user;
-#  create_account_query="REPLACE INTO contributor_facts \
-# (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
-#  conversion_key, source_key,team_key) \
-#  SELECT '1st account action', min(utc_datetime), 1, min(utc_date_key),  \
-#  contributor_key, conversion_key, source_key, team_key \
-#  FROM sumo_facts  \
-#  INNER JOIN conversion ON (conversion_desc='Creating SUMO account') \
-#  INNER JOIN source ON (source_name='sumo') \
-#  INNER JOIN team ON (team_name='Sumo') \
-#  WHERE utc_datetime BETWEEN %s and %s \
-#  GROUP BY contributor_key"
-#  run_queries.run_dw_query(create_account_query, (str(lower_limit),str(upper_limit))) 
-#
-#  edit_kb_article_query="INSERT IGNORE INTO contributor_facts \
-# (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
-#  conversion_key, source_key,team_key) \
-#  SELECT canonical, utc_datetime, 1, utc_date_key, \
-#  contributor_key,conversion_key,source.source_key,team.team_key \
-#  FROM sumo_facts \
-#  INNER JOIN conversion ON (conversion_desc='edit 1 article in KB') \
-#  INNER JOIN source ON (source_name='sumo') \
-#  INNER JOIN team ON (team_name='Sumo') \
-#  WHERE utc_datetime BETWEEN %s and %s \
-#  AND action='kb';"
+  create_account_query="REPLACE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, min(utc_datetime), 1, min(utc_date_key),  \
+  contributor_key, conversion_key, source_key, team_key \
+  FROM sumo_facts  \
+  INNER JOIN conversion ON (conversion_desc='Creating SUMO account') \
+  INNER JOIN source ON (source_name='sumo') \
+  INNER JOIN team ON (team_name='Sumo') \
+  WHERE utc_datetime BETWEEN %s and %s \
+  GROUP BY contributor_key"
+  run_queries.run_dw_query(create_account_query, (str(lower_limit),str(upper_limit))) 
+
+  edit_kb_article_query="INSERT IGNORE INTO contributor_facts \
+ (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key,conversion_key,source.source_key,team.team_key \
+  FROM sumo_facts \
+  INNER JOIN conversion ON (conversion_desc='edit 1 article in KB') \
+  INNER JOIN source ON (source_name='sumo') \
+  INNER JOIN team ON (team_name='Sumo') \
+  WHERE utc_datetime BETWEEN %s and %s \
+  AND action='kb';"
 #  run_queries.run_dw_query(edit_kb_article_query, (str(lower_limit),str(upper_limit)))
 
+  localize_kb_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key,conversion_key,source.source_key,team.team_key \
+  FROM sumo_facts \
+  INNER JOIN conversion ON (conversion_desc='l10n 1 KB article') \
+  INNER JOIN source ON (source_name='sumo') \
+  INNER JOIN team ON (team_name='Sumo') \
+  WHERE utc_datetime BETWEEN %s and %s \
+  AND action='localization';"
+#  run_queries.run_dw_query(localize_kb_query, (str(lower_limit),str(upper_limit)))
+
   edit_5_kb_articles_query=create_kb_revision_query(str(5))
+  localize_5_kb_articles_query=create_l10n_query(str(5))
   at_least_4_forum_answers=create_forum_answer_query(str(4))
   at_least_10_forum_answers=create_forum_answer_query(str(10))
   # for each Monday from lower_limit to upper_limit
   # run the aggregate queries with the date as the param. 
-  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
-  for key,value in mondays.iteritems():
-    for idx, val in enumerate(value):
+#  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
+#  for key,value in mondays.iteritems():
+#    for idx, val in enumerate(value):
 #      run_queries.run_dw_query(edit_5_kb_articles_query, (val,val))
+#      run_queries.run_dw_query(localize_5_kb_articles_query, (val,val))
 #      run_queries.run_dw_query(at_least_4_forum_answers, (val,val))
-      run_queries.run_dw_query(at_least_10_forum_answers, (val,val))
+#      run_queries.run_dw_query(at_least_10_forum_answers, (val,val))
 
 def import_dates():
   #placeholder for importing dates from sumo_facts_raw
   dw_mysql.update_utc_dates(str(lower_limit),str(upper_limit))
 
 
+import_accounts()
 #import_forum_posts()
 #import_l10n()
 #import_kb()
@@ -217,5 +262,5 @@ def import_dates():
 #import_topic()
 ############import_dates()
 #aggregate_to_sumo_facts()
-aggregate_to_contributor_facts()
+#aggregate_to_contributor_facts()
 
