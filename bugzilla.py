@@ -3,9 +3,10 @@ import dw_mysql
 
 lower_limit="2014-06-01 00:00:00";
 upper_limit="2014-07-01 00:00:00";
-
-#print lower_limit
-#print upper_limit
+lower_limit="1990-01-01 00:00:00";
+upper_limit="2005-01-01 00:00:00";
+print lower_limit
+print upper_limit
 
 def import_attachments(): 
   export_query="SELECT \
@@ -66,9 +67,37 @@ def import_components():
   VALUES (%s,%s,%s);"
   dw_mysql.export_import("bugzilla", export_query, (),import_query)
 
+def import_comments():
+  export_query="SELECT \
+  login_name, longdescs.bug_when, \
+  TIMEDIFF(UTC_TIMESTAMP(),NOW()) AS tz_offset,  \
+  'comment', longdescs.bug_id, bug_status, \
+  products.name, components.name \
+  FROM bugs.longdescs INNER JOIN bugs.bugs USING (bug_id) \
+  INNER JOIN bugs.profiles ON (who=profiles.userid) \
+  INNER JOIN bugs.products ON (products.id=product_id) \
+  INNER JOIN bugs.components ON (components.id=component_id) \
+  WHERE bug_when between %s and %s"
+  import_query="INSERT IGNORE INTO bug_facts_raw \
+  set contributor_email=%s, local_datetime=%s, tz_offset=%s, \
+  fields=%s, bug_id=%s, status=%s, product=%s, component=%s"
+  dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
+def import_account_creation():
+  export_query="SELECT login_name, creation_ts, \
+  TIMEDIFF(UTC_TIMESTAMP(),NOW()) AS tz_offset, \
+  'Creating Bugzilla account', 0, '', '', '' \
+  FROM bugs.profiles \
+  WHERE creation_ts between %s and %s"
+  import_query="INSERT IGNORE INTO bug_facts_raw \
+  set contributor_email=%s, local_datetime=%s, tz_offset=%s, \
+  fields=%s, bug_id=%s, status=%s, product=%s, component=%s;"
+  dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
+
+#import_products()
+#import_components()
+#import_status()
 #import_attachments()
 #import_bugs_activity()
-import_products()
-import_components()
-import_status()
+#import_comments()
+import_account_creation()
