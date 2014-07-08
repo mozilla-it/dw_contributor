@@ -5,7 +5,7 @@ import run_queries
 lower_limit="2014-06-01 00:00:00";
 upper_limit="2014-07-01 00:00:00";
 
-lower_limit="1990-00-00 00:00:00";
+lower_limit="2010-01-01 00:00:00";
 upper_limit="2014-06-01 00:00:00";
 print lower_limit
 print upper_limit
@@ -23,7 +23,7 @@ def import_forum_posts():
   INNER JOIN questions_question ON (question_id=questions_question.id) \
   LEFT JOIN questions_question_products ON (questions_question_products.question_id=questions_question.id) \
   LEFT JOIN products_product on (products_product.id=questions_question_products.product_id) \
-  WHERE questions_answer.updated between %s and %s;"
+  WHERE questions_answer.updated BETWEEN %s AND %s;"
 
   import_query="INSERT IGNORE INTO sumo_facts_raw \
   set email=%s, extra_locale=%s, extra_topic=%s,  \
@@ -42,7 +42,7 @@ def import_forum_posts():
 #  FROM forums_post INNER JOIN auth_user ON (author_id=auth_user.id) \
 #  INNER JOIN forums_thread ON (forums_post.thread_id=forums_thread.id) \
 #  INNER JOIN forums_forum ON (forums_thread.forum_id=forums_forum.id) \
-#  WHERE forums_post.updated between %s and %s;"
+#  WHERE forums_post.updated BETWEEN %s AND %s;"
 #
 #  import_query="INSERT IGNORE INTO sumo_facts_raw \
 #  set email=%s, extra_product=%s, extra_locale=%s,  \
@@ -65,7 +65,7 @@ def import_l10n():
   LEFT JOIN products_product on (products_product.id=wiki_document_products.product_id) \
   LEFT JOIN wiki_document_topics ON (wiki_document_topics.document_id=wiki_document.id) \
   LEFT JOIN products_topic on (products_topic.id=wiki_document_topics.topic_id) \
-  WHERE locale!='en_US' AND wiki_revision.created between %s and %s;"  
+  WHERE locale!='en_US' AND wiki_revision.created BETWEEN %s AND %s;"  
 
   import_query="INSERT IGNORE INTO sumo_facts_raw \
   set email=%s, action=%s, extra_locale=%s,  \
@@ -88,7 +88,7 @@ def import_kb():
   LEFT JOIN products_product on (products_product.id=wiki_document_products.product_id) \
   LEFT JOIN wiki_document_topics ON (wiki_document_topics.document_id=wiki_document.id) \
   LEFT JOIN products_topic on (products_topic.id=wiki_document_topics.topic_id) \
-  WHERE locale='en-US' AND wiki_revision.created between %s and %s;"
+  WHERE locale='en-US' AND wiki_revision.created BETWEEN %s AND %s;"
 
   import_query="INSERT IGNORE INTO sumo_facts_raw \
   set email=%s, action=%s, extra_locale=%s,  \
@@ -132,8 +132,7 @@ def aggregate_to_sumo_facts():
   run_queries.run_dw_query(aggregate_query, (str(lower_limit),str(upper_limit)))
   
 def create_kb_revision_query(grp_cnt):
-  kb_revision_query="set group_concat_max_len=1073741824; \
-  INSERT IGNORE INTO contributor_facts \
+  kb_revision_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
   SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
@@ -143,7 +142,7 @@ def create_kb_revision_query(grp_cnt):
   INNER JOIN source ON (source_name='sumo') \
   INNER JOIN team ON (team_name='Sumo') \
   INNER JOIN conversion as for_n_edits ON (for_n_edits.conversion_desc='edit " + grp_cnt + " articles in kb') \
-  WHERE utc_datetime=%s-interval 1 year \
+  WHERE utc_datetime BETWEEN %s - interval 1 year AND %s \
   GROUP BY contributor_key HAVING count(*)>=" + grp_cnt
   return kb_revision_query
 
@@ -178,7 +177,8 @@ def aggregate_to_contributor_facts():
   # for each Monday from begin time to end time, run create_kb_revision_query with teh date as the param. do for 1/1/2013 through current
   mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
   for key,value in mondays.iteritems():
-    run_queries.run_dw_query(edit_5_kb_articles_query, value)
+    for idx, val in enumerate(value):
+      run_queries.run_dw_query(edit_5_kb_articles_query, (val,val))
   
 def import_dates():
   #placeholder for importing dates from sumo_facts_raw
