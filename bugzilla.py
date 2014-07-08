@@ -3,8 +3,6 @@ import dw_mysql
 
 lower_limit="2014-06-01 00:00:00";
 upper_limit="2014-07-01 00:00:00";
-lower_limit="2005-01-01 00:00:00";
-upper_limit="2014-07-01 00:00:00";
 print lower_limit
 print upper_limit
 
