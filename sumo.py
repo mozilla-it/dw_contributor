@@ -143,7 +143,7 @@ def create_kb_revision_query(grp_cnt):
   INNER JOIN source ON (source_name='sumo') \
   INNER JOIN team ON (team_name='Sumo') \
   INNER JOIN conversion as for_n_edits ON (for_n_edits.conversion_desc='edit " + grp_cnt + " articles in kb') \
-  WHERE utc_datetime>=%s-interval 1 year \
+  WHERE utc_datetime=%s-interval 1 year \
   GROUP BY contributor_key HAVING count(*)>=" + grp_cnt
   return kb_revision_query
 

@@ -1,0 +1,137 @@
+diff --git a/bugzilla.py b/bugzilla.py
+index 0a03246..86493ce 100755
+--- a/bugzilla.py
++++ b/bugzilla.py
+@@ -3,8 +3,8 @@ import dw_mysql
+ 
+ lower_limit="2014-06-01 00:00:00";
+ upper_limit="2014-07-01 00:00:00";
+-lower_limit="1990-01-01 00:00:00";
+-upper_limit="2005-01-01 00:00:00";
++lower_limit="2005-01-01 00:00:00";
++upper_limit="2014-07-01 00:00:00";
+ print lower_limit
+ print upper_limit
+ 
+@@ -100,4 +100,5 @@ def import_account_creation():
+ #import_attachments()
+ #import_bugs_activity()
+ #import_comments()
+-import_account_creation()
++#import_account_creation()
++
+diff --git a/dw_mysql.py b/dw_mysql.py
+index 664c15a..f1e2e6b 100755
+--- a/dw_mysql.py
++++ b/dw_mysql.py
+@@ -1,6 +1,18 @@
+ #!/usr/bin/python
+ import run_queries
+ 
++def get_mondays(lower_limit, upper_limit):
++  get_mondays_query='SELECT utc_date_only FROM utc_date_only WHERE dayOfWeek=2 \
++  AND utc_date_only BETWEEN %s and %s'
++  return run_queries.run_dw_query(get_mondays_query, (str(lower_limit),str(upper_limit)))
++
++def update_utc_dates(lower_limit, upper_limit):
++  update_query="UPDATE utc_date_only \
++  SET dayOfWeek=DAYOFWEEK(utc_date_only), weekOfYear=WEEK(utc_date_only), \
++  monthOfYear=MONTH(utc_date_only), year=YEAR(utc_date_only) \
++  WHERE utc_date_only BETWEEN %s and %s";
++  run_queries.run_dw_query(update_query,(lower_limit,upper_limit))
++
+ def import_dates_to_UTC(source, lower_limit, upper_limit):
+   if source=="sumo":
+     table='sumo_facts_raw'
+diff --git a/sumo.py b/sumo.py
+index 32db971..613c3e4 100755
+--- a/sumo.py
++++ b/sumo.py
+@@ -5,6 +5,11 @@ import run_queries
+ lower_limit="2014-06-01 00:00:00";
+ upper_limit="2014-07-01 00:00:00";
+ 
++lower_limit="1990-00-00 00:00:00";
++upper_limit="2014-06-01 00:00:00";
++print lower_limit
++print upper_limit
++
+ def import_forum_posts(): 
+   export_query="SELECT \
+   email, locale, '' as topic, \
+@@ -126,11 +131,67 @@ def aggregate_to_sumo_facts():
+   WHERE local_datetime BETWEEN %s AND %s;"
+   run_queries.run_dw_query(aggregate_query, (str(lower_limit),str(upper_limit)))
+   
+-import_forum_posts()
+-import_l10n()
+-import_kb()
+-import_contributors()
+-import_product()
+-import_topic()
+-import_dates()
+-aggregate_to_sumo_facts()
++def create_kb_revision_query(grp_cnt):
++  kb_revision_query="set group_concat_max_len=1073741824; \
++  INSERT IGNORE INTO contributor_facts \
++  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
++  conversion_key, source_key,team_key) \
++  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
++  contributor_key, for_n_edits.conversion_key,source.source_key,team.team_key \
++  FROM contributor_facts \
++  INNER JOIN conversion as for_1_edit ON (for_1_edit.conversion_desc='edit 1 article in KB' AND for_1_edit.conversion_key=contributor_facts.conversion_key) \
++  INNER JOIN source ON (source_name='sumo') \
++  INNER JOIN team ON (team_name='Sumo') \
++  INNER JOIN conversion as for_n_edits ON (for_n_edits.conversion_desc='edit " + grp_cnt + " articles in kb') \
++  WHERE utc_datetime>=%s-interval 1 year \
++  GROUP BY contributor_key HAVING count(*)>=" + grp_cnt
++  return kb_revision_query
++
++def aggregate_to_contributor_facts():
++  create_account_query="REPLACE INTO contributor_facts \
++ (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
++  conversion_key, source_key,team_key) \
++  SELECT '1st account action', min(utc_datetime), 1, min(utc_date_key),  \
++  contributor_key, conversion_key, source_key, team_key \
++  FROM sumo_facts  \
++  INNER JOIN conversion ON (conversion_desc='Creating SUMO account') \
++  INNER JOIN source ON (source_name='sumo') \
++  INNER JOIN team ON (team_name='Sumo') \
++  WHERE utc_datetime BETWEEN %s and %s \
++  GROUP BY contributor_key"
++  run_queries.run_dw_query(create_account_query, (str(lower_limit),str(upper_limit))) 
++
++  edit_kb_article_query="INSERT IGNORE INTO contributor_facts \
++ (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
++  conversion_key, source_key,team_key) \
++  SELECT canonical, utc_datetime, 1, utc_date_key, \
++  contributor_key,conversion_key,source.source_key,team.team_key \
++  FROM sumo_facts \
++  INNER JOIN conversion ON (conversion_desc='edit 1 article in KB') \
++  INNER JOIN source ON (source_name='sumo') \
++  INNER JOIN team ON (team_name='Sumo') \
++  WHERE utc_datetime BETWEEN %s and %s \
++  AND action='kb';"
++  run_queries.run_dw_query(edit_kb_article_query, (str(lower_limit),str(upper_limit)))
++
++  edit_5_kb_articles_query=create_kb_revision_query(str(5))
++  # for each Monday from begin time to end time, run create_kb_revision_query with teh date as the param. do for 1/1/2013 through current
++  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
++  for key,value in mondays.iteritems():
++    run_queries.run_dw_query(edit_5_kb_articles_query, value)
++  
++def import_dates():
++  #placeholder for importing dates from sumo_facts_raw
++  dw_mysql.update_utc_dates(str(lower_limit),str(upper_limit))
++
++
++#import_forum_posts()
++#import_l10n()
++#import_kb()
++#import_contributors()
++#import_product()
++#import_topic()
++############import_dates()
++#aggregate_to_sumo_facts()
++aggregate_to_contributor_facts()
++
