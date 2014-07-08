@@ -1,6 +1,18 @@
 #!/usr/bin/python
 import run_queries
 
+def get_mondays(lower_limit, upper_limit):
+  get_mondays_query='SELECT utc_date_only FROM utc_date_only WHERE dayOfWeek=2 \
+  AND utc_date_only BETWEEN %s and %s'
+  return run_queries.run_dw_query(get_mondays_query, (str(lower_limit),str(upper_limit)))
+
+def update_utc_dates(lower_limit, upper_limit):
+  update_query="UPDATE utc_date_only \
+  SET dayOfWeek=DAYOFWEEK(utc_date_only), weekOfYear=WEEK(utc_date_only), \
+  monthOfYear=MONTH(utc_date_only), year=YEAR(utc_date_only) \
+  WHERE utc_date_only BETWEEN %s and %s";
+  run_queries.run_dw_query(update_query,(lower_limit,upper_limit))
+
 def import_dates_to_UTC(source, lower_limit, upper_limit):
   if source=="sumo":
     table='sumo_facts_raw'
