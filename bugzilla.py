@@ -1,7 +1,8 @@
 #!/usr/bin/python
 import dw_mysql
+import run_queries
 
-lower_limit="2014-06-01 00:00:00";
+lower_limit="1994-06-01 00:00:00";
 upper_limit="2014-07-01 00:00:00";
 print lower_limit
 print upper_limit
@@ -92,11 +93,27 @@ def import_account_creation():
   fields=%s, bug_id=%s, status=%s, product=%s, component=%s;"
   dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
+def populate_contributor():
+  populate_contributor="INSERT IGNORE INTO contributor (email)  \
+  SELECT contributor_email  \
+  FROM bug_facts_raw  \
+  WHERE local_datetime BETWEEN %s and %s";
+  run_queries.run_dw_query(populate_contributor, (str(lower_limit),str(upper_limit)))
+
+  populate_contributor="INSERT IGNORE INTO contributor (email)  \
+  SELECT email  \
+  FROM bug_attachment  \
+  WHERE local_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(populate_contributor, (str(lower_limit),str(upper_limit)))
+
+
 #import_products()
 #import_components()
 #import_status()
 #import_attachments()
 #import_bugs_activity()
 #import_comments()
+dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
 #import_account_creation()
+#populate_contributor()
 

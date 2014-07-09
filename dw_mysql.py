@@ -6,13 +6,6 @@ def get_mondays(lower_limit, upper_limit):
   AND utc_date_only BETWEEN %s and %s'
   return run_queries.run_dw_query(get_mondays_query, (str(lower_limit),str(upper_limit)))
 
-def update_utc_dates(lower_limit, upper_limit):
-  update_query="UPDATE utc_date_only \
-  SET dayOfWeek=DAYOFWEEK(utc_date_only), weekOfYear=WEEK(utc_date_only), \
-  monthOfYear=MONTH(utc_date_only), year=YEAR(utc_date_only) \
-  WHERE utc_date_only BETWEEN %s and %s";
-  run_queries.run_dw_query(update_query,(lower_limit,upper_limit))
-
 def import_dates_to_UTC(source, lower_limit, upper_limit):
   if source=="sumo":
     table='sumo_facts_raw'
@@ -25,6 +18,13 @@ def import_dates_to_UTC(source, lower_limit, upper_limit):
   SELECT distinct(DATE(ADDTIME(local_datetime,tz_offset))) FROM " \
   + table + " WHERE local_datetime BETWEEN %s and %s ORDER BY 1;"
   run_queries.run_dw_query(import_query,(lower_limit,upper_limit))
+
+  update_query="UPDATE utc_date_only \
+  SET dayOfWeek=DAYOFWEEK(utc_date_only), weekOfYear=WEEK(utc_date_only), \
+  monthOfYear=MONTH(utc_date_only), year=YEAR(utc_date_only) \
+  WHERE utc_date_only BETWEEN %s and %s";
+  run_queries.run_dw_query(update_query,(lower_limit,upper_limit))
+
 
 def import_contributors_to_dimension (source, lower_limit, upper_limit):
   if source=="sumo":

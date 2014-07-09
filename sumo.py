@@ -129,9 +129,6 @@ def import_topic():
   WHERE local_datetime BETWEEN %s AND %s"
   run_queries.run_dw_query(import_query, (str(lower_limit),str(upper_limit)))
   
-def import_dates():
-  dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
-
 def aggregate_to_sumo_facts():
   aggregate_query="INSERT IGNORE INTO sumo_facts ( \
   cnt, contributor_key, utc_datetime, canonical, \
@@ -219,7 +216,7 @@ def aggregate_to_contributor_facts():
   INNER JOIN team ON (team_name='Sumo') \
   WHERE utc_datetime BETWEEN %s and %s \
   AND action='kb';"
-#  run_queries.run_dw_query(edit_kb_article_query, (str(lower_limit),str(upper_limit)))
+  run_queries.run_dw_query(edit_kb_article_query, (str(lower_limit),str(upper_limit)))
 
   localize_kb_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
@@ -232,7 +229,7 @@ def aggregate_to_contributor_facts():
   INNER JOIN team ON (team_name='Sumo') \
   WHERE utc_datetime BETWEEN %s and %s \
   AND action='localization';"
-#  run_queries.run_dw_query(localize_kb_query, (str(lower_limit),str(upper_limit)))
+  run_queries.run_dw_query(localize_kb_query, (str(lower_limit),str(upper_limit)))
 
   edit_5_kb_articles_query=create_kb_revision_query(str(5))
   localize_5_kb_articles_query=create_l10n_query(str(5))
@@ -240,27 +237,24 @@ def aggregate_to_contributor_facts():
   at_least_10_forum_answers=create_forum_answer_query(str(10))
   # for each Monday from lower_limit to upper_limit
   # run the aggregate queries with the date as the param. 
-#  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
-#  for key,value in mondays.iteritems():
-#    for idx, val in enumerate(value):
-#      run_queries.run_dw_query(edit_5_kb_articles_query, (val,val))
-#      run_queries.run_dw_query(localize_5_kb_articles_query, (val,val))
-#      run_queries.run_dw_query(at_least_4_forum_answers, (val,val))
-#      run_queries.run_dw_query(at_least_10_forum_answers, (val,val))
-
-def import_dates():
-  #placeholder for importing dates from sumo_facts_raw
-  dw_mysql.update_utc_dates(str(lower_limit),str(upper_limit))
+  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
+  for key,value in mondays.iteritems():
+    for idx, val in enumerate(value):
+      run_queries.run_dw_query(edit_5_kb_articles_query, (val,val))
+      run_queries.run_dw_query(localize_5_kb_articles_query, (val,val))
+      run_queries.run_dw_query(at_least_4_forum_answers, (val,val))
+      run_queries.run_dw_query(at_least_10_forum_answers, (val,val))
 
 
-import_accounts()
+
+#import_accounts()
 #import_forum_posts()
 #import_l10n()
 #import_kb()
 #import_contributors()
 #import_product()
 #import_topic()
-############import_dates()
+dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
 #aggregate_to_sumo_facts()
 #aggregate_to_contributor_facts()
 
