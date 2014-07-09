@@ -4,8 +4,6 @@ import run_queries
 
 lower_limit="1994-06-01 00:00:00";
 upper_limit="2014-06-01 00:00:00";
-lower_limit="1998-06-01 00:00:00";
-upper_limit="2000-01-01 00:00:00";
 print lower_limit
 print upper_limit
 
@@ -132,7 +130,8 @@ def aggregate_to_bug_facts():
   CONCAT('https://bugzilla.mozilla.org/show_bug.cgi?id=',bug_id) as canonical, \
   added_values, removed_values, attachment_id, bug_id, \
   contributor.contributor_key, bug_product.product_key, \
-  bug_component.component_key, bug_status.status_key, utc_date_only.utc_date_key \
+  IFNULL(bug_component.component_key,0),  \
+  bug_status.status_key, utc_date_only.utc_date_key \
   FROM bug_facts_raw INNER JOIN contributor ON (contributor_email=email) \
   INNER JOIN utc_date_only ON (DATE(ADDTIME(local_datetime,tz_offset))=utc_date_only) \
   LEFT JOIN bug_status ON (status=status_name) \
@@ -192,7 +191,7 @@ def aggregate_to_contributor_facts():
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
   SELECT canonical, utc_datetime, 1, utc_date_key,  \
-  contributor.contributor_key, conversion_key, source_key,team_key \
+  contributor.contributor_key, conversion_key, source_key,IFNULL(team_key,0) \
   FROM bug_facts  \
   INNER JOIN contributor USING (contributor_key) \
   INNER JOIN conversion ON (conversion_desc='Submitting patch') \
@@ -207,7 +206,7 @@ def aggregate_to_contributor_facts():
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
   conversion_key, source_key,team_key) \
   SELECT canonical, utc_datetime, 1, utc_date_key,  \
-  contributor.contributor_key, conversion_key, source_key,team_key \
+  contributor.contributor_key, conversion_key, source_key,IFNULL(team_key,0) \
   FROM bug_facts  \
   INNER JOIN conversion ON (conversion_desc='Having patch be approved') \
   INNER JOIN source ON (source_name='bugzilla') \
