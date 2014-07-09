@@ -2,10 +2,8 @@
 import dw_mysql
 import run_queries
 
-lower_limit="1994-06-01 00:00:00";
-upper_limit="2014-06-01 00:00:00";
-print lower_limit
-print upper_limit
+lower_limit=sys.argv[1]
+upper_limit=sys.argv[2]
 
 def import_attachments(): 
   export_query="SELECT \

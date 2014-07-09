@@ -1,14 +1,10 @@
 #!/usr/bin/python
 import dw_mysql
 import run_queries
+import sys
 
-lower_limit="2014-06-01 00:00:00";
-upper_limit="2014-07-01 00:00:00";
-
-lower_limit="2008-01-01 00:00:00";
-upper_limit="2014-06-01 00:00:00";
-print lower_limit
-print upper_limit
+lower_limit=sys.argv[1]
+upper_limit=sys.argv[2]
 
 def import_accounts(): 
   export_query="SELECT \

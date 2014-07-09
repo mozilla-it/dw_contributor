@@ -2,8 +2,8 @@
 import run_queries
 import dw_mysql
 
-lower_limit="2008-01-01 00:00:00";
-upper_limit="2009-01-01 00:00:00";
+lower_limit=sys.argv[1]
+upper_limit=sys.argv[2]
 print lower_limit
 print upper_limit
 
