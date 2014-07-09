@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import run_queries
 import dw_mysql
+import sys 
 
 lower_limit=sys.argv[1]
 upper_limit=sys.argv[2]
