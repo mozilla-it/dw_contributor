@@ -3,7 +3,7 @@ import dw_mysql
 import run_queries
 
 lower_limit="1994-06-01 00:00:00";
-upper_limit="2014-07-01 00:00:00";
+upper_limit="2014-06-01 00:00:00";
 print lower_limit
 print upper_limit
 
@@ -106,6 +106,26 @@ def populate_contributor():
   WHERE local_datetime BETWEEN %s and %s"
   run_queries.run_dw_query(populate_contributor, (str(lower_limit),str(upper_limit)))
 
+def aggregate_to_bug_facts():
+  aggregate_query="INSERT IGNORE INTO bug_facts (utc_datetime, fields, \
+  canonical, added_values, removed_values, attachment_key, bug_id, \
+  contributor_key,product_key, component_key, status_key, utc_date_key) \
+  SELECT ADDTIME(local_datetime,tz_offset), fields,  \
+  CONCAT('https://bugzilla.mozilla.org/show_bug.cgi?id=',bug_id) as canonical, \
+  added_values, removed_values, attachment_id, bug_id, \
+  contributor.contributor_key, bug_product.product_key, \
+  bug_component.component_key, bug_status.status_key, utc_date_only.utc_date_key \
+  FROM bug_facts_raw INNER JOIN contributor ON (contributor_email=email) \
+  INNER JOIN bug_product ON (product=product_name) \
+  INNER JOIN bug_component ON (component=component_name) \
+  INNER JOIN bug_status ON (status=status_name) \
+  INNER JOIN utc_date_only ON (DATE(ADDTIME(local_datetime,tz_offset))=utc_date_only) \
+  WHERE local_datetime BETWEEN %s AND %s;"
+  run_queries.run_dw_query(aggregate_query, (str(lower_limit),str(upper_limit)))
+
+def import_dates() :
+  dw_mysql.import_dates_to_UTC('bugzilla',str(lower_limit),str(upper_limit))
+
 
 #import_products()
 #import_components()
@@ -113,7 +133,7 @@ def populate_contributor():
 #import_attachments()
 #import_bugs_activity()
 #import_comments()
-dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
 #import_account_creation()
+#import_dates()
 #populate_contributor()
-
+#aggregate_to_bug_facts()

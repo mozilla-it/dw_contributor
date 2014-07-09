@@ -245,7 +245,8 @@ def aggregate_to_contributor_facts():
       run_queries.run_dw_query(at_least_4_forum_answers, (val,val))
       run_queries.run_dw_query(at_least_10_forum_answers, (val,val))
 
-
+def import_dates():
+  dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
 
 #import_accounts()
 #import_forum_posts()
@@ -254,7 +255,7 @@ def aggregate_to_contributor_facts():
 #import_contributors()
 #import_product()
 #import_topic()
-dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
+import_dates()
 #aggregate_to_sumo_facts()
 #aggregate_to_contributor_facts()
 
