@@ -4,6 +4,8 @@ import run_queries
 
 lower_limit="1994-06-01 00:00:00";
 upper_limit="2014-06-01 00:00:00";
+lower_limit="1998-06-01 00:00:00";
+upper_limit="2000-01-01 00:00:00";
 print lower_limit
 print upper_limit
 
@@ -76,18 +78,34 @@ def import_comments():
   INNER JOIN bugs.profiles ON (who=profiles.userid) \
   INNER JOIN bugs.products ON (products.id=product_id) \
   INNER JOIN bugs.components ON (components.id=component_id) \
-  WHERE bug_when between %s and %s"
+  WHERE bug_when BETWEEN %s and %s"
   import_query="INSERT IGNORE INTO bug_facts_raw \
   set contributor_email=%s, local_datetime=%s, tz_offset=%s, \
   fields=%s, bug_id=%s, status=%s, product=%s, component=%s"
   dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
+def number_comments():
+  get_bugs_query="SELECT bug_id FROM bug_facts  \
+  WHERE fields='comment' AND utc_datetime BETWEEN %s AND %s"
+  bugs=run_queries.run_dw_query(get_bugs_query,(str(lower_limit),str(upper_limit)))
+
+  for key,value in bugs.iteritems():
+    for idx, val in enumerate(value):
+      single_bug_query="SELECT min(utc_datetime) FROM bug_facts \
+      WHERE fields='comment' AND bug_id=%s ORDER BY utc_datetime;"
+      single_bug=run_queries.run_dw_query(single_bug_query,(val))
+      for key2,value2 in single_bug.iteritems():
+        for idx2, val2 in enumerate(value2):
+          comment_num_update="UPDATE bug_facts SET comment_num=0 \
+          WHERE bug_id=%s AND utc_datetime=%s"
+          run_queries.run_dw_query(comment_num_update,(val,val2))
+  
 def import_account_creation():
   export_query="SELECT login_name, creation_ts, \
   TIMEDIFF(UTC_TIMESTAMP(),NOW()) AS tz_offset, \
   'Creating Bugzilla account', 0, '', '', '' \
   FROM bugs.profiles \
-  WHERE creation_ts between %s and %s"
+  WHERE creation_ts BETWEEN %s and %s"
   import_query="INSERT IGNORE INTO bug_facts_raw \
   set contributor_email=%s, local_datetime=%s, tz_offset=%s, \
   fields=%s, bug_id=%s, status=%s, product=%s, component=%s;"
@@ -116,16 +134,90 @@ def aggregate_to_bug_facts():
   contributor.contributor_key, bug_product.product_key, \
   bug_component.component_key, bug_status.status_key, utc_date_only.utc_date_key \
   FROM bug_facts_raw INNER JOIN contributor ON (contributor_email=email) \
-  INNER JOIN bug_product ON (product=product_name) \
-  INNER JOIN bug_component ON (component=component_name) \
-  INNER JOIN bug_status ON (status=status_name) \
   INNER JOIN utc_date_only ON (DATE(ADDTIME(local_datetime,tz_offset))=utc_date_only) \
+  LEFT JOIN bug_status ON (status=status_name) \
+  LEFT JOIN bug_product ON (product=product_name) \
+  LEFT JOIN bug_component ON (component=component_name) \
   WHERE local_datetime BETWEEN %s AND %s;"
   run_queries.run_dw_query(aggregate_query, (str(lower_limit),str(upper_limit)))
 
 def import_dates() :
   dw_mysql.import_dates_to_UTC('bugzilla',str(lower_limit),str(upper_limit))
 
+def aggregate_to_contributor_facts():
+  file_one_firefoxOS_bug_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Filing a bug Firefox OS') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE comment_num=0 AND product_name='Firefox OS' \
+  AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(file_one_firefoxOS_bug_query, (str(lower_limit),str(upper_limit)))
+
+  create_bugzilla_account_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Creating Bugzilla account') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields='Creating Bugzilla account'  \
+  AND utc_datetime BETWEEN %s AND %s"
+  run_queries.run_dw_query(create_bugzilla_account_query, (str(lower_limit),str(upper_limit)))
+#  file_one_bug_query="INSERT IGNORE INTO contributor_facts \"
+#  run_queries.run_dw_query(file_one_bug_query, (str(lower_limit),str(upper_limit)))
+
+  file_one_bug_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Filing a bug') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE comment_num=0 AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(file_one_bug_query, (str(lower_limit),str(upper_limit)))
+
+  submit_one_patch_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key,  \
+  contributor.contributor_key, conversion_key, source_key,team_key \
+  FROM bug_facts  \
+  INNER JOIN contributor USING (contributor_key) \
+  INNER JOIN conversion ON (conversion_desc='Submitting patch') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN bug_attachment USING (attachment_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE ispatch=1 AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(submit_one_patch_query, (str(lower_limit),str(upper_limit)))
+
+  approve_one_patch_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key,  \
+  contributor.contributor_key, conversion_key, source_key,team_key \
+  FROM bug_facts  \
+  INNER JOIN conversion ON (conversion_desc='Having patch be approved') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  INNER JOIN bug_attachment USING (attachment_key) \
+  INNER JOIN contributor USING (contributor_key) \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields = 'flagtypes.name' AND added_values LIKE 'review+%' \
+  AND ispatch=1 AND utc_datetime BETWEEN %s AND %s;"
+  run_queries.run_dw_query(approve_one_patch_query, (str(lower_limit),str(upper_limit)))
 
 #import_products()
 #import_components()
@@ -136,4 +228,6 @@ def import_dates() :
 #import_account_creation()
 #import_dates()
 #populate_contributor()
-#aggregate_to_bug_facts()
+aggregate_to_bug_facts()
+number_comments()
+aggregate_to_contributor_facts()
