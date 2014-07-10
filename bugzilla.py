@@ -215,7 +215,46 @@ def aggregate_to_contributor_facts():
 #  AND ispatch=1 AND utc_datetime BETWEEN %s AND %s;"
 #  run_queries.run_dw_query(approve_one_patch_query, (str(lower_limit),str(upper_limit)))
 
-  one_triage_query="INSERT IGNORE INTO contributor_facts \
+  one_triage_product_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields regexp 'product' AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(one_triage_product_query, (str(lower_limit),str(upper_limit)))
+
+  one_triage_component_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields regexp 'component' AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(one_triage_component_query, (str(lower_limit),str(upper_limit)))
+
+  one_triage_comment_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields='comment' AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(one_triage_comment_query, (str(lower_limit),str(upper_limit)))
+
+  one_triage_status_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
   conversion_key, source_key) \
   SELECT canonical, utc_datetime, 1, utc_date_key, \
@@ -226,7 +265,7 @@ def aggregate_to_contributor_facts():
   LEFT JOIN bug_product USING (product_key) \
   LEFT JOIN team ON (team_name=product_name) \
   WHERE fields regexp 'bug_status' AND utc_datetime BETWEEN %s and %s"
-  run_queries.run_dw_query(one_triage_query, (str(lower_limit),str(upper_limit)))
+  run_queries.run_dw_query(one_triage_status_query, (str(lower_limit),str(upper_limit)))
 
 #import_components()
 #import_status()
