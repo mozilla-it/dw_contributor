@@ -142,6 +142,19 @@ def aggregate_to_bug_facts():
 def import_dates() :
   dw_mysql.import_dates_to_UTC('bugzilla',str(lower_limit),str(upper_limit))
 
+def create_triage_query(grp_cnt):
+  create_triage_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
+  contributor_key, for_n_triages.conversion_key,source_key,team_key \
+  FROM contributor_facts \
+  INNER JOIN conversion as for_1_triage ON (for_1_triage.conversion_desc in ('Change status 1 bug','Comment 1 bug','Change product 1 bug','Change component 1 bug') AND for_1_triage.conversion_key=contributor_facts.conversion_key) \
+  INNER JOIN conversion as for_n_triages ON (for_n_triages.conversion_desc='Help triage " + grp_cnt + " bugs per quarter in bugzilla.mozilla.org') \
+  WHERE utc_datetime BETWEEN %s - INTERVAL 1 QUARTER AND %s \
+  GROUP BY contributor_key,for_1_triage.conversion_key,canonical HAVING count(*)>=" + grp_cnt
+  return create_triage_query
+
 def aggregate_to_contributor_facts():
 #  file_one_firefoxOS_bug_query="INSERT IGNORE INTO contributor_facts \
 #  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
@@ -221,7 +234,7 @@ def aggregate_to_contributor_facts():
   SELECT canonical, utc_datetime, 1, utc_date_key, \
   contributor_key, conversion_key, source_key \
   FROM bug_facts \
-  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN conversion ON (conversion_desc='Change product 1 bug') \
   INNER JOIN source ON (source_name='bugzilla') \
   LEFT JOIN bug_product USING (product_key) \
   LEFT JOIN team ON (team_name=product_name) \
@@ -234,25 +247,12 @@ def aggregate_to_contributor_facts():
   SELECT canonical, utc_datetime, 1, utc_date_key, \
   contributor_key, conversion_key, source_key \
   FROM bug_facts \
-  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN conversion ON (conversion_desc='Change component 1 bug') \
   INNER JOIN source ON (source_name='bugzilla') \
   LEFT JOIN bug_product USING (product_key) \
   LEFT JOIN team ON (team_name=product_name) \
   WHERE fields regexp 'component' AND utc_datetime BETWEEN %s and %s"
   run_queries.run_dw_query(one_triage_component_query, (str(lower_limit),str(upper_limit)))
-
-  one_triage_comment_query="INSERT IGNORE INTO contributor_facts \
-  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
-  conversion_key, source_key) \
-  SELECT canonical, utc_datetime, 1, utc_date_key, \
-  contributor_key, conversion_key, source_key \
-  FROM bug_facts \
-  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
-  INNER JOIN source ON (source_name='bugzilla') \
-  LEFT JOIN bug_product USING (product_key) \
-  LEFT JOIN team ON (team_name=product_name) \
-  WHERE fields='comment' AND utc_datetime BETWEEN %s and %s"
-  run_queries.run_dw_query(one_triage_comment_query, (str(lower_limit),str(upper_limit)))
 
   one_triage_status_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
@@ -260,12 +260,40 @@ def aggregate_to_contributor_facts():
   SELECT canonical, utc_datetime, 1, utc_date_key, \
   contributor_key, conversion_key, source_key \
   FROM bug_facts \
-  INNER JOIN conversion ON (conversion_desc='Help triage 1 bug per quarter in bugzilla.mozilla.org') \
+  INNER JOIN conversion ON (conversion_desc='Change status 1 bug') \
   INNER JOIN source ON (source_name='bugzilla') \
   LEFT JOIN bug_product USING (product_key) \
   LEFT JOIN team ON (team_name=product_name) \
   WHERE fields regexp 'bug_status' AND utc_datetime BETWEEN %s and %s"
   run_queries.run_dw_query(one_triage_status_query, (str(lower_limit),str(upper_limit)))
+
+  one_triage_comment_query="INSERT IGNORE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key, \
+  conversion_key, source_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  contributor_key, conversion_key, source_key \
+  FROM bug_facts \
+  INNER JOIN conversion ON (conversion_desc='Comment 1 bug') \
+  INNER JOIN source ON (source_name='bugzilla') \
+  LEFT JOIN bug_product USING (product_key) \
+  LEFT JOIN team ON (team_name=product_name) \
+  WHERE fields='comment' AND utc_datetime BETWEEN %s and %s"
+  run_queries.run_dw_query(one_triage_comment_query, (str(lower_limit),str(upper_limit)))
+
+  triage_10_bugs_query=create_triage_query(str(10))
+  triage_25_bugs_query=create_triage_query(str(25))
+  triage_50_bugs_query=create_triage_query(str(50))
+  triage_100_bugs_query=create_triage_query(str(100))
+
+  # for each Monday from lower_limit to upper_limit
+  # run the aggregate queries with the date as the param. 
+  mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
+  for key,value in mondays.iteritems():
+    for idx, val in enumerate(value):
+      run_queries.run_dw_query(triage_10_bugs_query, (val,val))
+      run_queries.run_dw_query(triage_25_bugs_query, (val,val))
+      run_queries.run_dw_query(triage_50_bugs_query, (val,val))
+      run_queries.run_dw_query(triage_100_bugs_query, (val,val))
 
 #import_components()
 #import_status()
