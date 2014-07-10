@@ -244,14 +244,14 @@ def aggregate_to_contributor_facts():
 def import_dates():
   dw_mysql.import_dates_to_UTC('sumo',str(lower_limit),str(upper_limit))
 
-#import_accounts()
-#import_forum_posts()
-#import_l10n()
-#import_kb()
-#import_contributors()
-#import_product()
-#import_topic()
+import_accounts()
+import_forum_posts()
+import_l10n()
+import_kb()
+import_contributors()
+import_product()
+import_topic()
 import_dates()
-#aggregate_to_sumo_facts()
-#aggregate_to_contributor_facts()
+aggregate_to_sumo_facts()
+aggregate_to_contributor_facts()
 

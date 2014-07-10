@@ -213,19 +213,19 @@ def aggregate_to_contributor_facts():
   INNER JOIN contributor USING (contributor_key) \
   LEFT JOIN bug_product USING (product_key) \
   LEFT JOIN team ON (team_name=product_name) \
-  WHERE fields = 'flagtypes.name' AND added_values LIKE 'review+%' \
+  WHERE fields = 'flagtypes.name' AND added_values REGEXP 'review\\+' \
   AND ispatch=1 AND utc_datetime BETWEEN %s AND %s;"
   run_queries.run_dw_query(approve_one_patch_query, (str(lower_limit),str(upper_limit)))
 
-#import_products()
-#import_components()
-#import_status()
-#import_attachments()
-#import_bugs_activity()
-#import_comments()
-#import_account_creation()
-#import_dates()
-#populate_contributor()
+import_products()
+import_components()
+import_status()
+import_attachments()
+import_bugs_activity()
+import_comments()
+import_account_creation()
+import_dates()
+populate_contributor()
 aggregate_to_bug_facts()
 number_comments()
 aggregate_to_contributor_facts()
