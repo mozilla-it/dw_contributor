@@ -16,14 +16,15 @@ def import_attachments():
   INNER JOIN bugs USING (bug_id) \
   INNER JOIN bugs.products ON (products.id=product_id) \
   INNER JOIN bugs.components ON (components.id=component_id) \
-  WHERE modification_time BETWEEN %s AND %s;"
+  WHERE modification_time BETWEEN %s AND %s \
+  OR attachments.creation_ts BETWEEN %s AND %s;"
 
   import_query="INSERT IGNORE INTO bug_attachment \
   set attachment_key=%s, email=%s, ispatch=%s,  \
   product=%s, component=%s,  \
   local_datetime=%s, tz_offset=%s;"
 
-  dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
+  dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit),str(lower_limit),str(upper_limit)),import_query)
 
 def import_bugs_activity():
   export_query= "SELECT \
