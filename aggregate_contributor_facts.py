@@ -15,7 +15,7 @@ FROM contributor_facts INNER JOIN conversion USING (conversion_key) \
 INNER JOIN team USING (team_key) \
 INNER JOIN source USING (source_key) \
 WHERE contributor_level='active' and  \
-utc_datetime BETWEEN %s - interval 1 year and %s"
+utc_datetime BETWEEN %s - interval 1 year and %s" 
 
 update_new1="CREATE TABLE `contributor_new_%s` (contributor_key int unsigned not null,c_date date not null); "
 update_new2="INSERT INTO `contributor_new_%s` (contributor_key,c_date)  \
@@ -31,7 +31,7 @@ WHERE c_date=%s AND contributor_key in \
 update_new5="DROP TABLE `contributor_new_%s`;"
 
 # for each Monday from lower_limit to upper_limit
-# run the aggregate queries with the date as the param.
+# run the aggregate queries with the date as the param. 
 mondays=dw_mysql.get_mondays(str(lower_limit),str(upper_limit))
 for key,value in mondays.iteritems():
   for idx, val in enumerate(value):
