@@ -13,7 +13,7 @@ def import_github_activity():
   github_organization,github_repository, \
   IFNULL(github_username,github_public_email),LEFT(commit_msg,255), \
   commit_id,action_type \
-  FROM gitribution2 \
+  FROM activities \
   WHERE github_public_email is not null AND happened_on BETWEEN %s AND %s;"
 
   import_query="INSERT IGNORE INTO github_facts_raw \
@@ -22,7 +22,7 @@ def import_github_activity():
   extra_github_username=%s, extra_commit_msg=%s,  \
   extra_commit_id=%s, action=%s;"
 
-  dw_mysql.export_import("github", export_query, (str(lower_limit),str(upper_limit),str(lower_limit),str(upper_limit)),import_query)
+  dw_mysql.export_import("github", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
 def populate_github_org():
   populate_github_org="INSERT IGNORE INTO github_org \

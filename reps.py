@@ -72,46 +72,59 @@ def import_dates():
 
 def aggregate_to_reps_facts():
   aggregate_query="INSERT IGNORE INTO reps_facts ( \
-  contributor_key, canonical, action, reps_org_key, reps_repo_key, \
-  utc_datetime, utc_date_key) \
-  SELECT contributor.contributor_key, canonical, action, \
-  IFNULL(reps_org.reps_org_key,0),  \
-  IFNULL(reps_repo.reps_repo_key,0), \
-  ADDTIME(local_datetime,tz_offset),  \
-  utc_date_only.utc_date_key \
-  FROM reps_facts_raw INNER JOIN contributor ON (reps_facts_raw.email=contributor.email) \
+  contributor_key, canonical, utc_datetime, utc_date_key, \
+  activity_key, source_key, campaign_key, location_key, \
+  contribution_area, event_url, activity_desc) \
+  SELECT contributor.contributor_key, canonical, \
+  ADDTIME(local_datetime,tz_offset), utc_date_only.utc_date_key, \
+  IFNULL(reps_activity.activity_key,0), source_key, \
+  IFNULL(reps_campaign.campaign_key,0), \
+  IFNULL(rl.location_key,0), \
+  contribution_area, event_url, activity_desc \
+  FROM reps_facts_raw AS raw INNER JOIN contributor ON (raw.email=contributor.email) \
   INNER JOIN utc_date_only ON (DATE(ADDTIME(local_datetime,tz_offset))=utc_date_only) \
-  LEFT JOIN reps_org ON (extra_reps_org=reps_org_name) \
-  LEFT JOIN reps_repo ON (extra_reps_repo=reps_repo_name) \
+  LEFT JOIN reps_activity ON (raw.activity=activity_name) \
+  LEFT JOIN source ON (raw.source_text=source_name) \
+  LEFT JOIN reps_campaign ON (raw.campaign=campaign_name) \
+  LEFT JOIN reps_location AS rl ON (raw.location=rl.location_name AND raw.longitude=rl.longitude AND raw.latitude=rl.latitude) \
   WHERE local_datetime BETWEEN %s AND %s;"
   run_queries.run_dw_query(aggregate_query, (str(lower_limit),str(upper_limit)))
 
 def aggregate_to_contributor_facts():
-  submit_patch_query="REPLACE INTO contributor_facts \
+  one_in_8_weeks_query="REPLACE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
   SELECT canonical, utc_datetime, 1, utc_date_key,  \
   contributor_key, conversion_key, source_key, team_key \
   FROM reps_facts  \
-  INNER JOIN conversion ON (conversion_desc='Submitting patch') \
-  INNER JOIN source ON (source_name='reps') \
-  INNER JOIN reps_repo ON (reps_facts.reps_repo_key=reps_repo.reps_repo_key) \
-  WHERE utc_datetime BETWEEN %s and %s \
-  AND action='pull-request-opened' "
-  run_queries.run_dw_query(submit_patch_query, (str(lower_limit),str(upper_limit)))
+  INNER JOIN conversion ON (conversion_desc='1 in 8 weeks') \
+  INNER JOIN team ON (team_name='Reps') \
+  WHERE utc_datetime BETWEEN %s - interval 8 week and %s"
+  run_queries.run_dw_query(one_in_8_weeks_query, (str(lower_limit),str(upper_limit)))
 
-  merge_patch_query="REPLACE INTO contributor_facts \
+  one_in_4_weeks_query="REPLACE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
   SELECT canonical, utc_datetime, 1, utc_date_key,  \
   contributor_key, conversion_key, source_key, team_key \
   FROM reps_facts  \
-  INNER JOIN conversion ON (conversion_desc='Having patch be merged') \
-  INNER JOIN source ON (source_name='reps') \
-  INNER JOIN reps_repo ON (reps_facts.reps_repo_key=reps_repo.reps_repo_key) \
-  WHERE utc_datetime BETWEEN %s and %s \
-  AND action='commit-author' "
-  run_queries.run_dw_query(merge_patch_query, (str(lower_limit),str(upper_limit)))
+  INNER JOIN conversion ON (conversion_desc='1 in 4 weeks') \
+  INNER JOIN team ON (team_name='Reps') \
+  WHERE utc_datetime BETWEEN %s - interval 4 week and %s"
+  run_queries.run_dw_query(one_in_4_weeks_query, (str(lower_limit),str(upper_limit)))
+
+  four_in_4_weeks_query="REPLACE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key,  \
+  contributor_key, conversion_key, source_key, team_key \
+  FROM reps_facts  \
+  INNER JOIN conversion as for_1_activity ON (for_1_activity.conversion_desc='1 in 4 weeks' AND for_1_activity.conversion_key=contributor_facts.conversion_key) \
+  INNER JOIN conversion as for_4_activities ON (for_4_activities.conversion_desc='4 in 4 weeks') \
+  INNER JOIN team ON (team_name='Reps') \
+  WHERE utc_datetime BETWEEN %s - interval 4 week and %s \
+  GROUP BY contributor_key,for_1_activity.conversion_key,canonical \
+  HAVING COUNT(*)>=4";
 
 import_reps_raw()
 import_campaign()
@@ -119,6 +132,6 @@ populate_reps_activity()
 populate_reps_location()
 populate_contributor()
 import_dates()
-#aggregate_to_reps_facts()
-#aggregate_to_contributor_facts()
+aggregate_to_reps_facts()
+aggregate_to_contributor_facts()
 
