@@ -81,15 +81,40 @@ def aggregate_to_github_facts():
 def import_dates():
   dw_mysql.import_dates_to_UTC('github',str(lower_limit),str(upper_limit))
 
-#def aggregate_to_contributor_facts():
+def aggregate_to_contributor_facts():
+  submit_patch_query="REPLACE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key,  \
+  contributor_key, conversion_key, source_key, team_key \
+  FROM github_facts  \
+  INNER JOIN conversion ON (conversion_desc='Submitting patch') \
+  INNER JOIN source ON (source_name='github') \
+  INNER JOIN github_repo ON (github_facts.github_repo_key=github_repo.github_repo_key) \
+  WHERE utc_datetime BETWEEN %s and %s \
+  AND action='pull-request-opened' "
+  run_queries.run_dw_query(submit_patch_query, (str(lower_limit),str(upper_limit)))
+
+  merge_patch_query="REPLACE INTO contributor_facts \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  conversion_key, source_key,team_key) \
+  SELECT canonical, utc_datetime, 1, utc_date_key,  \
+  contributor_key, conversion_key, source_key, team_key \
+  FROM github_facts  \
+  INNER JOIN conversion ON (conversion_desc='Having patch be merged') \
+  INNER JOIN source ON (source_name='github') \
+  INNER JOIN github_repo ON (github_facts.github_repo_key=github_repo.github_repo_key) \
+  WHERE utc_datetime BETWEEN %s and %s \
+  AND action='commit-author' "
+  run_queries.run_dw_query(merge_patch_query, (str(lower_limit),str(upper_limit)))
 
 # importing needs to wait until we have a netflow open
 # and we modify the file to have ssl
-#import_github_activity()
+import_github_activity()
 populate_github_org()
 populate_github_repo()
 populate_contributor()
 import_dates()
 aggregate_to_github_facts()
-#aggregate_to_contributor_facts()
+aggregate_to_contributor_facts()
 

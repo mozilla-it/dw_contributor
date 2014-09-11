@@ -6,6 +6,10 @@ import sys
 lower_limit=sys.argv[1]
 upper_limit=sys.argv[2]
 
+# this is the max size of the "canonical" text field
+# to avoid truncation warnings when the script is run
+canonical_size=65000
+
 def import_accounts(): 
   export_query="SELECT \
   email, '' as locale, '' as topic, '' as product,  \
@@ -44,25 +48,6 @@ def import_forum_posts():
   extra_id=%s, local_datetime=%s, tz_offset=%s;"
 
   dw_mysql.export_import("sumo", export_query, (str(lower_limit),str(upper_limit)), import_query)
-
-#def WHAT_IS_THIS():
-#  export_query="SELECT \
-#  email, '' as product, '' as locale, slug as extra_topic,  \
-#  CONCAT('https://support.mozilla.org/forums/contributors/',thread_id,'#post-',forums_post.id) as canonical, \
-#  '????????????' as action, forums_post.id as extra_id,  \
-#  forums_post.updated as local_datetime, \
-#  TIMEDIFF(UTC_TIMESTAMP(),NOW()) as tz_offset \
-#  FROM forums_post INNER JOIN auth_user ON (author_id=auth_user.id) \
-#  INNER JOIN forums_thread ON (forums_post.thread_id=forums_thread.id) \
-#  INNER JOIN forums_forum ON (forums_thread.forum_id=forums_forum.id) \
-#  WHERE forums_post.updated BETWEEN %s AND %s;"
-#
-#  import_query="INSERT IGNORE INTO sumo_facts_raw \
-#  set email=%s, extra_product=%s, extra_locale=%s,  \
-#  extra_topic=%s, canonical=%s, action=%s,  \
-#  extra_id=%s, local_datetime=%s, tz_offset=%s;"
-#
-#  dw_mysql.export_import("sumo", export_query, (str(lower_limit),str(upper_limit)), import_query)
 
 def import_l10n():
   export_query="SELECT \
@@ -145,7 +130,8 @@ def create_kb_revision_query(grp_cnt):
   kb_revision_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  max(utc_datetime), 1, utc_date_key, \
   contributor_key, for_n_edits.conversion_key,source.source_key,team.team_key \
   FROM contributor_facts \
   INNER JOIN conversion as for_1_edit ON (for_1_edit.conversion_desc='edit 1 article in KB' AND for_1_edit.conversion_key=contributor_facts.conversion_key) \
@@ -160,7 +146,8 @@ def create_l10n_query(grp_cnt):
   l10n_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  max(utc_datetime), 1, utc_date_key, \
   contributor_key, for_n_l10ns.conversion_key,source.source_key,team.team_key \
   FROM contributor_facts \
   INNER JOIN conversion as for_1_l10n ON (for_1_l10n.conversion_desc='l10n 1 KB article' AND for_1_l10n.conversion_key=contributor_facts.conversion_key) \
@@ -175,7 +162,8 @@ def create_forum_answer_query(grp_cnt):
   forum_answer_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT group_concat(canonical), max(utc_datetime), 1, utc_date_key, \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  max(utc_datetime), 1, utc_date_key, \
   contributor_key, for_n_forum_answers.conversion_key,source.source_key,team.team_key \
   FROM sumo_facts \
   INNER JOIN source ON (source_name='sumo') \
@@ -191,7 +179,8 @@ def aggregate_to_contributor_facts():
   create_account_query="REPLACE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT canonical, min(utc_datetime), 1, min(utc_date_key),  \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  min(utc_datetime), 1, min(utc_date_key),  \
   contributor_key, conversion_key, source_key, team_key \
   FROM sumo_facts  \
   INNER JOIN conversion ON (conversion_desc='Creating SUMO account') \
@@ -202,9 +191,10 @@ def aggregate_to_contributor_facts():
   run_queries.run_dw_query(create_account_query, (str(lower_limit),str(upper_limit))) 
 
   edit_kb_article_query="INSERT IGNORE INTO contributor_facts \
- (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
+  (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  utc_datetime, 1, utc_date_key, \
   contributor_key,conversion_key,source.source_key,team.team_key \
   FROM sumo_facts \
   INNER JOIN conversion ON (conversion_desc='edit 1 article in KB') \
@@ -217,7 +207,8 @@ def aggregate_to_contributor_facts():
   localize_kb_query="INSERT IGNORE INTO contributor_facts \
   (canonical, utc_datetime, cnt, utc_date_key, contributor_key,  \
   conversion_key, source_key,team_key) \
-  SELECT canonical, utc_datetime, 1, utc_date_key, \
+  SELECT LEFT(group_concat(canonical)," + str(canonical_size) + ") as canonical, \
+  utc_datetime, 1, utc_date_key, \
   contributor_key,conversion_key,source.source_key,team.team_key \
   FROM sumo_facts \
   INNER JOIN conversion ON (conversion_desc='l10n 1 KB article') \
@@ -254,4 +245,3 @@ import_topic()
 import_dates()
 aggregate_to_sumo_facts()
 aggregate_to_contributor_facts()
-

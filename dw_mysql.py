@@ -7,12 +7,10 @@ def get_mondays(lower_limit, upper_limit):
   return run_queries.run_dw_query(get_mondays_query, (str(lower_limit),str(upper_limit)))
 
 def import_dates_to_UTC(source, lower_limit, upper_limit):
-  if source=="sumo":
-    table='sumo_facts_raw'
-  if source=="github":
-    table='github_facts_raw'
   if source=="bugzilla": 
     table='bug_facts_raw'
+  else:
+    table=source+"_facts_raw"
 
   import_query="INSERT IGNORE INTO utc_date_only (utc_date_only) \
   SELECT distinct(DATE(ADDTIME(local_datetime,tz_offset))) FROM " \
@@ -40,15 +38,18 @@ def import_contributors_to_dimension (source, lower_limit, upper_limit):
   run_queries.run_dw_query(import_query,(lower_limit,upper_limit))
 
 def export_import (source, exp_query, exp_params, imp_query):
-  if source=="sumo":
-    output=run_queries.run_sumo_query(exp_query, exp_params)
-  if source=="github":
-    output=run_queries.run_github_query(exp_query, exp_params)
   if source=="bugzilla":
     output=run_queries.run_bugzilla_query(exp_query, exp_params)
+  if source=="github":
+    output=run_queries.run_github_query(exp_query, exp_params)
+  if source=="reps":
+    output=run_queries.run_reps_query(exp_query, exp_params)
+  if source=="sumo":
+    output=run_queries.run_sumo_query(exp_query, exp_params)
   for key,value in output.iteritems():
     imp_params=()
     for idx, val in enumerate(value):
+      #print idx, val
       imp_params=imp_params + (val,)
     #print imp_query ,imp_params
     run_queries.run_dw_query(imp_query, imp_params)

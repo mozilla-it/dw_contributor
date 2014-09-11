@@ -46,21 +46,21 @@ def import_bugs_activity():
   dw_mysql.export_import("bugzilla", export_query, (str(lower_limit),str(upper_limit)),import_query)
 
 def import_status():
-  export_query="SELECT id,value from bug_status;"
+  export_query="SELECT id,value FROM bug_status;"
   import_query="INSERT IGNORE INTO bug_status \
   (status_key,status_name) \
   VALUES (%s,%s);"
   dw_mysql.export_import("bugzilla", export_query, (),import_query)
 
 def import_products():
-  export_query="SELECT id,name from products;"
+  export_query="SELECT id,name FROM products;"
   import_query="INSERT IGNORE INTO bug_product \
   (product_key,product_name) \
   VALUES (%s,%s);"
   dw_mysql.export_import("bugzilla", export_query, (),import_query)
 
 def import_components():
-  export_query="SELECT id,name,product_id from components;"
+  export_query="SELECT id,name,product_id FROM components;"
   import_query="INSERT IGNORE INTO bug_component \
   (component_key,component_name,product_key) \
   VALUES (%s,%s,%s);"
