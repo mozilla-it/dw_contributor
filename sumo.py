@@ -38,8 +38,7 @@ def import_forum_posts():
   TIMEDIFF(UTC_TIMESTAMP(),NOW()) as tz_offset \
   FROM questions_answer INNER JOIN auth_user ON (creator_id=auth_user.id) \
   INNER JOIN questions_question ON (question_id=questions_question.id) \
-  LEFT JOIN questions_question_products ON (questions_question_products.question_id=questions_question.id) \
-  LEFT JOIN products_product on (products_product.id=questions_question_products.product_id) \
+  LEFT JOIN products_product on (products_product.id=questions_question.product_id) \
   WHERE questions_answer.updated BETWEEN %s AND %s;"
 
   import_query="INSERT IGNORE INTO sumo_facts_raw \
